@@ -1,0 +1,13 @@
+=== MÉTRICAS DE AVALIAÇÃO DO PROJETO DE PDI ===
+
+Total de Imagens analisadas: 22
+Verdadeiros Positivos (TP) : 11
+Verdadeiros Negativos (TN) : 11
+Falsos Positivos (FP)      : 0
+Falsos Negativos (FN)      : 0
+
+Acurácia       : 100.00%
+Precisão       : 100.00%
+Sensibilidade  : 100.00%
+Especificidade : 100.00%
+F1-Score       : 100.00%

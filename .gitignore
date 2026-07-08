@@ -1,0 +1,22 @@
+# Ambientes virtuais e pacotes
+venv/
+.venv/
+env/
+ENV/
+bin/
+lib/
+share/
+include/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Resultados locais e temporários (opcional ignorar)
+# results/

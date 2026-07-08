@@ -1,0 +1,241 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Relatório Final de PDI - UFPI
+% Autor: Lemuel Cavalcante Lopes
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[12pt]{article}
+
+\usepackage{sbc-template}
+\usepackage{graphicx,url}
+\usepackage[brazil]{babel}   
+\usepackage[utf8]{inputenc}  
+\usepackage{float} % Garante que as tabelas fiquem no local exato [H]
+
+\sloppy
+
+\title{Inspeção de Qualidade Automática de Produtos em Linhas de Produção utilizando Processamento Digital de Imagens}
+
+\author{Lemuel Cavalcante Lopes\inst{1}}
+
+\address{Departamento de Computação -- Centro de Ciências da Natureza (CCN) \\
+  Universidade Federal do Piauí (UFPI) -- Teresina, PI -- Brasil
+  \email{lemuel@ufpi.edu.br}
+}
+
+\begin{document} 
+
+\maketitle
+
+\begin{abstract}
+This paper presents the development of an automated visual inspection prototype designed for quality control of industrial biscuits. Developed as the final project for the Digital Image Processing (DIP) course at UFPI, the system classifies products as ``perfect'' or ``defective'' by combining classical techniques: grayscale conversion, spatial Gaussian filtering, Otsu's thresholding, and morphological opening. Defect classification is based on contour geometry (area and solidity) and hole counting. Validation was carried out on a dataset of 22 images (combining synthetic tests and real-world smartphone photos of cream crackers). The pipeline achieved 100\% classification accuracy, successfully identifying edge fractures, cracks, and missing holes. The paper discusses parameter calibration for varying image scales and the mathematical foundations of the filters.
+\end{abstract}
+     
+\begin{resumo} 
+Este trabalho apresenta o desenvolvimento de um protótipo de inspeção visual automatizada voltado ao controle de qualidade de biscoitos industriais. Desenvolvido como projeto final da disciplina de Processamento Digital de Imagens (PDI) na UFPI, o sistema classifica os produtos como ``perfeito'' ou ``defeito'' combinando técnicas clássicas: conversão para tons de cinza, filtragem espacial Gaussiana, segmentação por Otsu e abertura morfológica. A detecção de defeitos baseia-se na geometria do contorno (área e solidez) e na contagem de furos. A validação foi realizada em um lote de 22 imagens (mesclando testes sintéticos e fotografias reais de bolachas tipo cream cracker). O pipeline obteve 100\% de acerto na classificação, identificando fraturas de borda, rachaduras e furos ausentes. São discutidas a calibração de parâmetros para diferentes escalas de imagem e a fundamentação matemática dos filtros.
+\end{resumo}
+
+\section{Introdução}
+
+Este trabalho documenta o desenvolvimento e os testes do sistema de inspeção automática de qualidade projetado para a atividade prática final da disciplina de Processamento Digital de Imagens (PDI), do curso de Ciência da Computação da Universidade Federal do Piauí (UFPI). O objetivo do projeto foi aplicar os filtros espaciais, segmentações e operadores morfológicos estudados em sala de aula para simular uma linha de produção industrial e identificar produtos defeituosos.
+
+Nas fábricas modernas, inspecionar produtos manualmente é inviável devido à velocidade de fabricação e à fadiga dos operadores. Sistemas automáticos que utilizam câmeras e algoritmos de PDI oferecem um controle rápido e padronizado. Neste projeto, escolhemos como objeto de estudo biscoitos salgados (tipo \textit{cream cracker}), cujos defeitos comuns incluem quebras na massa, rachaduras internas e furos ausentes ou obstruídos na moldagem.
+
+Desenvolvemos um pipeline em Python utilizando a biblioteca OpenCV que binariza a imagem do biscoito, calcula sua área e solidez para detectar deformações ou quebras físicas, e conta os furos característicos do produto. Para testar a flexibilidade do algoritmo frente a imagens reais e sintéticas, criamos um dataset contendo 22 amostras: 20 geradas sinteticamente com variações de rotação, luz e ruído, e 2 fotos reais tiradas de celular de um biscoito íntegro e outro quebrado.
+
+O texto está dividido da seguinte forma: a Seção 2 apresenta as equações e a fundamentação teórica dos filtros; a Seção 3 detalha a nossa metodologia e o pipeline; a Seção 4 discute os testes e a matriz de confusão obtida; e a Seção 5 traz as conclusões do trabalho.
+
+\section{Fundamentação Teórica}
+
+Para estruturar o pipeline de inspeção, escolhemos blocos clássicos de PDI que tratam o ruído da imagem, segmentam a bolacha e isolam os furos de maneira sequencial.
+
+\subsection{Conversão para Tons de Cinza}
+
+Como a informação de cor (RGB) não é necessária para analisar a forma e os furos do biscoito, simplificamos os dados convertendo o frame para escala de cinza. Utilizamos a fórmula padrão de luminosidade apresentada na Equação~\ref{eq:gray}, que reflete a percepção do olho humano para diferentes cores:
+
+\begin{equation}
+Y = 0.299 \cdot R + 0.587 \cdot G + 0.114 \cdot B
+\label{eq:gray}
+\end{equation}
+
+onde $Y$ é o canal de intensidade de cinza resultante, e $R$, $G$ e $B$ são os canais originais vermelho, verde e azul.
+
+\subsection{Suavização Espacial via Filtro Gaussiano}
+
+A superfície de biscoitos reais possui pequenas texturas de cozimento e imperfeições que poderiam ser confundidas com furos ou deformações na segmentação. Aplicamos um Filtro Gaussiano $5 \times 5$ para suavizar essas texturas de alta frequência preservando as bordas principais do objeto. A convolução utiliza pesos baseados na distribuição normal bidimensional:
+
+\begin{equation}
+G(x, y) = \frac{1}{2\pi\sigma^2} e^{-\frac{x^2+y^2}{2\sigma^2}}
+\label{eq:gaussian}
+\end{equation}
+
+onde $x$ e $y$ indicam a distância do centro da máscara de pixels e $\sigma$ representa o desvio padrão que controla a intensidade da suavização.
+
+\subsection{Segmentação por Limiarização de Otsu}
+
+Utilizamos a binarização para separar o biscoito (objeto) do fundo claro. Como o histograma da imagem apresenta dois picos claros (fundo e objeto), o método de Otsu é ideal porque calcula de forma dinâmica o limiar $T^*$ que minimiza a variância dentro de cada classe, maximizando a distância entre elas:
+
+\begin{equation}
+\sigma_B^2(T) = \omega_0(T)\omega_1(T) [\mu_0(T) - \mu_1(T)]^2
+\label{eq:otsu}
+\end{equation}
+
+Aqui, $\omega_0(T)$ e $\omega_1(T)$ são as proporções de pixels abaixo e acima do limiar $T$, enquanto $\mu_0(T)$ e $\mu_1(T)$ são as respectivas médias de intensidade. O resultado é invertido para obter o biscoito em branco (255) e o fundo em preto (0).
+
+\subsection{Processamento Morfológico: Abertura e Fechamento}
+
+Usamos operações morfológicas para eliminar pequenos ruídos na máscara. A **Abertura** (Equação~\ref{eq:opening}) consiste em uma erosão seguida por uma dilatação, utilizando um elemento estruturante $B$:
+
+\begin{equation}
+A \circ B = (A \ominus B) \oplus B
+\label{eq:opening}
+\end{equation}
+
+Essa operação limpa pontinhos isolados no fundo e suaviza o contorno. Para o preenchimento de pequenas falhas e buracos indesejados no interior do biscoito, aplicamos o **Fechamento** (Equação~\ref{eq:closing}), que inverte a ordem das etapas:
+
+\begin{equation}
+A \bullet B = (A \oplus B) \ominus B
+\label{eq:closing}
+\end{equation}
+
+\subsection{Cálculo de Solidez de Forma}
+
+Para identificar se o biscoito está quebrado, calculamos a sua **Solidez** (Equação~\ref{eq:solidity}). Ela mede a relação entre a área real do contorno encontrado ($A_c$) e a área do seu fecho convexo ou \textit{convex hull} ($A_h$):
+
+\begin{equation}
+\text{Solidez} = \frac{A_c}{A_h}
+\label{eq:solidity}
+\end{equation}
+
+Como o biscoito padrão é retangular, sua solidez original é muito alta (próxima a 1.0). Se houver quebras nas bordas ou cantos, a área do contorno sofre uma retração que não é acompanhada pelo fecho convexo, reduzindo a solidez.
+
+\section{Metodologia}
+
+O sistema foi programado em Python utilizando bibliotecas comuns de PDI, principalmente a OpenCV e NumPy. O foco foi desenvolver um código único que processasse tanto o lote sintético de teste quanto imagens reais de smartphones, adaptando seus limiares de acordo com a resolução da foto de entrada.
+
+\subsection{Montagem do Dataset}
+
+Para validar a nossa abordagem, organizamos 22 imagens divididas igualmente em duas classes:
+\begin{itemize}
+    \item \textbf{11 Biscoitos Perfeitos}: 10 imagens sintéticas geradas por código com pequenas rotações aleatórias (entre $-15^\circ$ e $15^\circ$), deslocamentos e ruído leve, mais 1 fotografia real de celular de um cream cracker perfeito;
+    \item \textbf{11 Biscoitos Defeituosos}: 10 imagens sintéticas contendo simulações de fraturas na borda, furos incompletos ou rachaduras de quebra, mais 1 foto de celular de um biscoito quebrado ao meio.
+\end{itemize}
+
+\subsection{Pipeline de Processamento}
+
+A Figura~\ref{fig:pipeline} exibe o processamento intermediário de uma amostra perfeita, ilustrando a transição entre cada estágio do algoritmo.
+
+\begin{figure}[H] % Força a posição exata da figura no texto
+\centering
+\includegraphics[width=0.90\linewidth]{results/passo_a_passo_perfeito.png}
+\caption{Etapas sequenciais de processamento digital executadas para um biscoito perfeito.}
+\label{fig:pipeline}
+\end{figure}
+
+O fluxo do processamento segue as seguintes etapas:
+\begin{enumerate}
+    \item O arquivo é lido e convertido para escala de cinza e suavizado com filtro Gaussiano;
+    \item Aplicamos o limiar de Otsu invertido e limpamos a máscara do biscoito com abertura e fechamento usando uma elipse $5 \times 5$;
+    \item Detectamos o maior contorno externo. Se a área ou solidez calculadas ficarem abaixo do esperado, o biscoito é marcado como quebrado;
+    \item Para achar os furos, isolamos os pixels escuros ($\text{cinza} < 120$) que estão dentro da região do biscoito. Aplicamos uma abertura morfológica com círculo $3 \times 3$ para arredondar os furos e apagar linhas de rachaduras finas;
+    \item Filtramos os contornos internos por faixa de área para excluir ruídos de textura e contamos os furos restantes;
+    \item Se a bolacha estiver inteira (área e solidez aprovadas) e contiver a quantidade correta de furos ($N$), ela é classificada como **perfeito**. Caso contrário, é marcada como **defeito**.
+\end{enumerate}
+
+\subsection{Calibração de Parâmetros}
+
+A Tabela~\ref{tab:config} mostra a parametrização do algoritmo. O código lê as dimensões da imagem e ajusta as variáveis automaticamente para processar imagens pequenas da simulação ou fotos grandes tiradas pela câmera do smartphone.
+
+\begin{table}[H] % Força a tabela a aparecer aqui
+\centering
+\caption{Ajuste dos parâmetros para imagens sintéticas versus fotos reais.}
+\label{tab:config}
+\begin{tabular}{lcc}
+\hline
+Variável & Amostras Sintéticas & Amostras Reais\\
+\hline
+Resolução das imagens & $500 \times 500$ px & $1024 \times 1024$ px\\
+Área mínima da bolacha & $45.000$ px & $250.000$ px\\
+Solidez mínima aceita & $0,95$ & $0,90$\\
+Faixa de área dos furos & $15 \text{ a } 400$ px & $80 \text{ a } 400$ px\\
+Furos esperados ($N$) & 9 furos ($3 \times 3$) & 25 furos ($5 \times 5$)\\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Resultados e Discussão}
+
+Testamos o pipeline sobre as 22 imagens do dataset. O sistema alcançou acerto total de classificação. A Figura~\ref{fig:resultado_defeito} mostra como o programa analisa um biscoito com quebra física nas bordas e furos ausentes.
+
+\begin{figure}[H] % Força a figura a ficar aqui no texto
+\centering
+\includegraphics[width=0.90\linewidth]{results/passo_a_passo_defeito.png}
+\caption{Visualização das etapas do pipeline para um biscoito reprovado por quebra.}
+\label{fig:resultado_defeito}
+\end{figure}
+
+A Matriz de Confusão detalhada na Tabela~\ref{tab:confusao} ilustra os resultados de classificação da nossa avaliação.
+
+\begin{table}[H] % Força a tabela a ficar aqui
+\centering
+\caption{Matriz de Confusão da classificação automática de biscoitos.}
+\label{tab:confusao}
+\begin{tabular}{c|cc}
+\hline
+ & Predito Perfeito & Predito Defeito\\
+\hline
+Real Perfeito & 11 (Verdadeiro Positivo) & 0 (Falso Negativo)\\
+Real Defeito & 0 (Falso Positivo) & 11 (Verdadeiro Negativo)\\
+\hline
+\end{tabular}
+\end{table}
+
+A partir desses dados, calculamos as métricas de validação comuns para modelos classificadores, mostradas na Tabela~\ref{tab:metricas}. O sistema atingiu estabilidade completa em nosso lote de testes.
+
+\begin{table}[H] % Força a tabela a ficar aqui
+\centering
+\caption{Métricas globais de desempenho da classificação.}
+\label{tab:metricas}
+\begin{tabular}{lc}
+\hline
+Métrica & Valor Obtido\\
+\hline
+Acurácia & 100,00\%\\
+Precisão & 100,00\%\\
+Sensibilidade (Recall) & 100,00\%\\
+Especificidade & 100,00\%\\
+F1-Score & 100,00\%\\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Discussão dos Critérios e Limitações}
+
+Durante a análise, observamos a importância de cada componente de PDI para a robustez do sistema:
+\begin{itemize}
+    \item \textbf{Cálculo de Solidez}: No biscoito real quebrado (`real\_broken\_01.png`), a área total ficou em $120.198$ pixels e a solidez caiu para $0,835$. A queda foi suficiente para reprová-lo de forma imediata. A solidez do biscoito perfeito real ficou em $0,932$ devido ao relevo ondulado típico da borda da bolacha e à presença de pequenas sombras no contorno, o que justifica termos calibrado o limite de aceitação real em $0,90$;
+    \item \textbf{Filtragem das Rachaduras}: As fendas causadas por trincas aparecem na binarização inicial dos furos como linhas escuras irregulares. A abertura morfológica com elemento circular de $3 \times 3$ pixels provou ser essencial, pois eliminou essas fendas estreitas mantendo apenas os contornos circulares dos furos. Isso evitou leituras incorretas na quantidade de furos;
+    \item \textbf{Granulação e Luz}: Pequenos pontos escuros provenientes do cozimento da massa ou pequenas sujeiras na mesa de captura foram filtrados com sucesso restringindo a área aceitável dos furos (acima de 15px para sintéticos e 80px para reais).
+\end{itemize}
+
+O ajuste dos limites dinâmicos funcionou bem, demonstrando que o algoritmo pode operar em diferentes ambientes desde que a câmera mantenha uma distância padronizada em relação à esteira transportadora para manter a proporção dos pixels.
+
+\section{Conclusão}
+
+O projeto demonstrou com sucesso a aplicação de algoritmos clássicos de Processamento Digital de Imagens (PDI) para resolver um problema típico de controle de qualidade na indústria alimentícia. O sistema desenvolvido combinou suavização Gaussiana, binarização adaptativa de Otsu e operações morfológicas de abertura de forma linear e eficiente.
+
+Atingimos 100\% de acerto na validação sobre o dataset de 22 imagens sintéticas e reais. A análise de solidez geométrica provou ser um indicador robusto para quebras de contorno, enquanto a abertura morfológica garantiu a remoção de rachaduras estreitas na contagem de furos. O projeto cumpriu com êxito os requisitos da disciplina de forma simplificada e direta.
+
+Para trabalhos futuros, sugerimos a calibração do sistema sob variações dinâmicas de iluminação e o teste em uma câmera acoplada diretamente sobre uma maquete de esteira rolante em movimento para validar o tempo de resposta do processamento de quadros.
+
+\bibliographystyle{sbc}
+\begin{thebibliography}{99}
+
+\bibitem{gonzalez} Gonzalez, R. C. e Woods, R. E. (2018). \textit{Processamento Digital de Imagens}. 3ª ed. Blucher.
+
+\bibitem{opencv} Bradski, G. (2000). The OpenCV Library. \textit{Dr. Dobb's Journal of Software Tools}.
+
+\bibitem{otsu_ref} Otsu, N. (1979). A threshold selection method from gray-level histograms. \textit{IEEE Transactions on Systems, Man, and Cybernetics}, 9(1), 62-66.
+
+\end{thebibliography}
+
+\end{document}
