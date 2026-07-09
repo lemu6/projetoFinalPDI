@@ -1,35 +1,38 @@
 import cv2
 import numpy as np
 
-def process_image(img_path, min_cookie_area=45000, min_solidity=0.95, min_hole_area=15, max_hole_area=400, expected_holes=9):
+def process_image(img_path, min_cookie_area=45000, min_solidity=0.95, min_hole_area=15, max_hole_area=400, expected_holes=9, is_real=False):
     """
     Executa o pipeline de PDI para inspecionar a qualidade de um biscoito.
-    
-    Retorna:
-        - label_pred: "perfeito" ou "defeito"
-        - info: dicionário com imagens intermediárias e métricas calculadas
+    Suporta modo sintético e modo real com correções de iluminação.
     """
     # 1. Carregar a imagem
     img = cv2.imread(img_path)
     if img is None:
         raise ValueError(f"Não foi possível carregar a imagem em: {img_path}")
         
-    # Mantém cópias em RGB para visualização
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img_draw = img_rgb.copy()
     
     # 2. Conversão para Tons de Cinza
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     
-    # 3. Suavização (Filtro Gaussiano)
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    
-    # 4. Segmentação do Biscoito (Otsu)
-    # Como o fundo é cinza claro (240) e o biscoito é marrom claro (~190), 
-    # usamos THRESH_BINARY_INV para o biscoito ficar branco (255) e o fundo preto (0).
+    if is_real:
+        # A. CORREÇÃO DE ILUMINAÇÃO (Sombras e Gradientes)
+        # Estima a iluminação de fundo usando um desfoque Gaussiano largo (maior que o biscoito)
+        kernel_size = 251
+        background = cv2.GaussianBlur(gray, (kernel_size, kernel_size), 0)
+        # Corrige dividindo a imagem pelo fundo estimado para normalizar a luz
+        corrected = np.clip(gray.astype(float) / background.astype(float) * 230, 0, 255).astype(np.uint8)
+        blur = cv2.GaussianBlur(corrected, (5, 5), 0)
+    else:
+        corrected = gray
+        blur = cv2.GaussianBlur(gray, (5, 5), 0)
+        
+    # 3. Segmentação do Biscoito (Otsu Global na imagem corrigida)
     _, thresh_cookie = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     
-    # Operação Morfológica na máscara do biscoito para limpar pequenos ruídos no fundo
+    # Limpeza morfológica da bolacha
     kernel_clean = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
     cookie_mask = cv2.morphologyEx(thresh_cookie, cv2.MORPH_OPEN, kernel_clean)
     cookie_mask = cv2.morphologyEx(cookie_mask, cv2.MORPH_CLOSE, kernel_clean)
@@ -43,12 +46,11 @@ def process_image(img_path, min_cookie_area=45000, min_solidity=0.95, min_hole_a
     is_broken = False
     
     if len(contours) > 0:
-        # Pega o maior contorno (deve ser o biscoito)
+        # Pega o maior contorno (bolacha)
         cookie_contour = max(contours, key=cv2.contourArea)
         cookie_area = cv2.contourArea(cookie_contour)
         
-        # Calcular Solidez (área do contorno / área do fecho convexo)
-        # Biscoitos quebrados têm reentrâncias e solidez menor.
+        # Calcular Solidez (área / fecho convexo)
         hull = cv2.convexHull(cookie_contour)
         hull_area = cv2.contourArea(hull)
         if hull_area > 0:
@@ -61,41 +63,52 @@ def process_image(img_path, min_cookie_area=45000, min_solidity=0.95, min_hole_a
     else:
         is_broken = True
         
-    # 5. Segmentação dos Furos
-    # Furos são bem mais escuros que a massa do biscoito (~50 vs ~190).
-    # Vamos criar uma máscara de pixels escuros apenas onde o biscoito existe.
-    dark_mask = np.zeros_like(gray)
-    dark_mask[(gray < 120) & (cookie_mask == 255)] = 255
-    
-    # Operação morfológica nos furos:
-    # Usamos Abertura (Opening) para eliminar linhas finas (rachaduras) ou ruídos minúsculos.
-    kernel_holes = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    cleaned_holes = cv2.morphologyEx(dark_mask, cv2.MORPH_OPEN, kernel_holes)
-    
-    # Encontrar os contornos dos furos
-    hole_contours, _ = cv2.findContours(cleaned_holes, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    
-    valid_holes = []
+    # 4. Segmentação dos Furos
     num_holes_detected = 0
+    cleaned_holes = np.zeros_like(gray)
     
-    for hc in hole_contours:
-        h_area = cv2.contourArea(hc)
-        # Filtrar por área para ignorar ruídos ou rachaduras muito grandes/pequenas
-        if min_hole_area <= h_area <= max_hole_area:
-            valid_holes.append(hc)
-            num_holes_detected += 1
-            # Desenha os furos detectados em verde no painel de visualização
-            cv2.drawContours(img_draw, [hc], -1, (0, 255, 0), 2)
-            
-    # Desenhar o contorno do biscoito em azul
     if cookie_contour is not None:
+        # Criar máscara isolada apenas para a bolacha selecionada
+        single_cookie_mask = np.zeros_like(cookie_mask)
+        cv2.drawContours(single_cookie_mask, [cookie_contour], -1, 255, -1)
+        
+        if is_real:
+            # B. OTSU LOCAL: Isola furos com base no histograma local da bolacha
+            local_biscuit = np.ones_like(gray) * 255
+            local_biscuit[single_cookie_mask == 255] = gray[single_cookie_mask == 255]
+            _, thresh_holes = cv2.threshold(local_biscuit, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        else:
+            thresh_holes = np.zeros_like(gray)
+            thresh_holes[(gray < 120) & (single_cookie_mask == 255)] = 255
+            
+        # Abertura nos furos para apagar linhas de rachadura e pequenas texturas
+        kernel_holes = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        cleaned_holes = cv2.morphologyEx(thresh_holes, cv2.MORPH_OPEN, kernel_holes)
+        
+        # Encontrar contornos dos furos
+        hole_contours, _ = cv2.findContours(cleaned_holes, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        
+        for hc in hole_contours:
+            h_area = cv2.contourArea(hc)
+            perimeter = cv2.arcLength(hc, True)
+            # C. FILTRO DE CIRCULARIDADE (Para rejeitar letras da marca estampada)
+            circularity = (4 * np.pi * h_area) / (perimeter ** 2) if perimeter > 0 else 0
+            
+            # Filtro baseado no tipo
+            if is_real:
+                # Na imagem real, filtramos por área e exigimos circularidade >= 0.60
+                is_valid = (min_hole_area <= h_area <= max_hole_area) and (circularity >= 0.60)
+            else:
+                is_valid = (min_hole_area <= h_area <= max_hole_area)
+                
+            if is_valid:
+                num_holes_detected += 1
+                cv2.drawContours(img_draw, [hc], -1, (0, 255, 0), 2)
+                
+        # Desenhar borda da bolacha
         cv2.drawContours(img_draw, [cookie_contour], -1, (255, 0, 0), 3)
         
-    # 6. Classificação final
-    # Critérios de perfeição:
-    # - Não está quebrado (área suficiente e solidez alta)
-    # - Tem exatamente expected_holes detectados
-    
+    # 5. Classificação final
     has_correct_holes = (num_holes_detected == expected_holes)
     
     if not is_broken and has_correct_holes:

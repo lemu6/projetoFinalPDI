@@ -27,11 +27,11 @@
 \maketitle
 
 \begin{abstract}
-This paper presents the development of an automated visual inspection prototype designed for quality control of industrial biscuits. Developed as the final project for the Digital Image Processing (DIP) course at UFPI, the system classifies products as ``perfect'' or ``defective'' by combining classical techniques: grayscale conversion, spatial Gaussian filtering, Otsu's thresholding, and morphological opening. Defect classification is based on contour geometry (area and solidity) and hole counting. Validation was carried out on a dataset of 22 images (combining synthetic tests and real-world smartphone photos of cream crackers). The pipeline achieved 100\% classification accuracy, successfully identifying edge fractures, cracks, and missing holes. The paper discusses parameter calibration for varying image scales and the mathematical foundations of the filters.
+This paper presents the development of an automated visual inspection prototype designed for quality control of industrial biscuits. Developed as the final project for the Digital Image Processing (DIP) course at UFPI, the system classifies products as ``perfect'' or ``defective'' by combining classical techniques: grayscale conversion, spatial Gaussian filtering, Otsu's thresholding, and morphological opening. Defect classification is based on contour geometry (area and solidity) and hole counting. Validation was carried out on a dataset of 37 images (combining synthetic tests and real-world smartphone photos of cream crackers). The pipeline achieved 86.49\% classification accuracy under variations of illumination and rotation. The paper discusses parameter calibration for varying image scales and the mathematical foundations of the filters.
 \end{abstract}
      
 \begin{resumo} 
-Este trabalho apresenta o desenvolvimento de um protótipo de inspeção visual automatizada voltado ao controle de qualidade de biscoitos industriais. Desenvolvido como projeto final da disciplina de Processamento Digital de Imagens (PDI) na UFPI, o sistema classifica os produtos como ``perfeito'' ou ``defeito'' combinando técnicas clássicas: conversão para tons de cinza, filtragem espacial Gaussiana, segmentação por Otsu e abertura morfológica. A detecção de defeitos baseia-se na geometria do contorno (área e solidez) e na contagem de furos. A validação foi realizada em um lote de 22 imagens (mesclando testes sintéticos e fotografias reais de bolachas tipo cream cracker). O pipeline obteve 100\% de acerto na classificação, identificando fraturas de borda, rachaduras e furos ausentes. São discutidas a calibração de parâmetros para diferentes escalas de imagem e a fundamentação matemática dos filtros.
+Este trabalho apresenta o desenvolvimento de um protótipo de inspeção visual automatizada voltado ao controle de qualidade de biscoitos industriais. Desenvolvido como projeto final da disciplina de Processamento Digital de Imagens (PDI) na UFPI, o sistema classifica os produtos como ``perfeito'' ou ``defeito'' combinando técnicas clássicas: conversão para tons de cinza, filtragem espacial Gaussiana, segmentação por Otsu e abertura morfológica. A detecção de defeitos baseia-se na geometria do contorno (área e solidez) e na contagem de furos. A validação foi realizada em um lote de 37 imagens (mesclando testes sintéticos e fotografias reais de bolachas tipo cream cracker). O pipeline obteve 86,49\% de acerto na classificação, identificando fraturas de borda, rachaduras e furos ausentes. São discutidas a calibração de parâmetros para diferentes escalas de imagem e a fundamentação matemática dos filtros.
 \end{resumo}
 
 \section{Introdução}
@@ -153,18 +153,18 @@ A Tabela~\ref{tab:config} mostra a parametrização do algoritmo. O código lê 
 \hline
 Variável & Amostras Sintéticas & Amostras Reais\\
 \hline
-Resolução das imagens & $500 \times 500$ px & $1024 \times 1024$ px\\
-Área mínima da bolacha & $45.000$ px & $250.000$ px\\
-Solidez mínima aceita & $0,95$ & $0,90$\\
-Faixa de área dos furos & $15 \text{ a } 400$ px & $80 \text{ a } 400$ px\\
-Furos esperados ($N$) & 9 furos ($3 \times 3$) & 25 furos ($5 \times 5$)\\
+Resolução das imagens & $500 \times 500$ px & $1600 \times 900$ px\\
+Área mínima da bolacha & $45.000$ px & $140.000$ px\\
+Solidez mínima aceita & $0,95$ & $0,92$\\
+Faixa de área dos furos & $15 \text{ a } 400$ px & $30 \text{ a } 800$ px\\
+Furos esperados ($N$) & 9 furos ($3 \times 3$) & 22 furos\\
 \hline
 \end{tabular}
 \end{table}
 
 \section{Resultados e Discussão}
 
-Testamos o pipeline sobre as 22 imagens do dataset. O sistema alcançou acerto total de classificação. A Figura~\ref{fig:resultado_defeito} mostra como o programa analisa um biscoito com quebra física nas bordas e furos ausentes.
+Testamos o pipeline sobre as 37 imagens do dataset. O sistema alcançou um desempenho robusto na classificação. A Figura~\ref{fig:resultado_defeito} mostra como o programa analisa um biscoito com quebra física nas bordas e furos ausentes.
 
 \begin{figure}[H] % Força a figura a ficar aqui no texto
 \centering
@@ -183,8 +183,8 @@ A Matriz de Confusão detalhada na Tabela~\ref{tab:confusao} ilustra os resultad
 \hline
  & Predito Perfeito & Predito Defeito\\
 \hline
-Real Perfeito & 11 (Verdadeiro Positivo) & 0 (Falso Negativo)\\
-Real Defeito & 0 (Falso Positivo) & 11 (Verdadeiro Negativo)\\
+Real Perfeito & 12 (Verdadeiro Positivo) & 3 (Falso Negativo)\\
+Real Defeito & 2 (Falso Positivo) & 20 (Verdadeiro Negativo)\\
 \hline
 \end{tabular}
 \end{table}
@@ -199,11 +199,11 @@ A partir desses dados, calculamos as métricas de validação comuns para modelo
 \hline
 Métrica & Valor Obtido\\
 \hline
-Acurácia & 100,00\%\\
-Precisão & 100,00\%\\
-Sensibilidade (Recall) & 100,00\%\\
-Especificidade & 100,00\%\\
-F1-Score & 100,00\%\\
+Acurácia & 86,49\%\\
+Precisão & 85,71\%\\
+Sensibilidade (Recall) & 80,00\%\\
+Especificidade & 90,91\%\\
+F1-Score & 82,76\%\\
 \hline
 \end{tabular}
 \end{table}
@@ -212,9 +212,9 @@ F1-Score & 100,00\%\\
 
 Durante a análise, observamos a importância de cada componente de PDI para a robustez do sistema:
 \begin{itemize}
-    \item \textbf{Cálculo de Solidez}: No biscoito real quebrado (`real\_broken\_01.png`), a área total ficou em $120.198$ pixels e a solidez caiu para $0,835$. A queda foi suficiente para reprová-lo de forma imediata. A solidez do biscoito perfeito real ficou em $0,932$ devido ao relevo ondulado típico da borda da bolacha e à presença de pequenas sombras no contorno, o que justifica termos calibrado o limite de aceitação real em $0,90$;
-    \item \textbf{Filtragem das Rachaduras}: As fendas causadas por trincas aparecem na binarização inicial dos furos como linhas escuras irregulares. A abertura morfológica com elemento circular de $3 \times 3$ pixels provou ser essencial, pois eliminou essas fendas estreitas mantendo apenas os contornos circulares dos furos. Isso evitou leituras incorretas na quantidade de furos;
-    \item \textbf{Granulação e Luz}: Pequenos pontos escuros provenientes do cozimento da massa ou pequenas sujeiras na mesa de captura foram filtrados com sucesso restringindo a área aceitável dos furos (acima de 15px para sintéticos e 80px para reais).
+    \item \textbf{Cálculo de Solidez}: Nos biscoitos reais perfeitos, o filtro de iluminação por divisão pelo fundo resultou em solidez média de $0,98$. Nos biscoitos quebrados (defeito), a solidez caiu drasticamente para a faixa de $0,58$ a $0,65$ devido à fratura física das bordas, permitindo a correta separação com o limiar de $0,92$;
+    \item \textbf{Filtragem das Rachaduras e Letras}: O logotipo da marca estampado (``FORTALEZA'') gerou pequenas linhas escuras. Ao combinarmos o Otsu local na bolacha, uma abertura morfológica e um filtro de circularidade robusto (rejeitando formas com circularidade menor que $0,60$), conseguimos ignorar todas as letras e contar com exatidão os 22 furos redondos da bolacha;
+    \item \textbf{Limitações Físicas}: Ocorreram 3 falsos negativos causados por pequenas variações extremas na iluminação local que encobriram ou adicionaram 1 furo na binarização, e 2 falsos positivos onde defeitos estruturais muito sutis (pequenas trincas sem quebra de borda) não alteraram a solidez e mantiveram os 22 furos intactos.
 \end{itemize}
 
 O ajuste dos limites dinâmicos funcionou bem, demonstrando que o algoritmo pode operar em diferentes ambientes desde que a câmera mantenha uma distância padronizada em relação à esteira transportadora para manter a proporção dos pixels.

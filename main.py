@@ -98,13 +98,14 @@ def run_evaluation():
             # Configurar parâmetros com base no tipo de imagem (sintética ou real)
             is_real = "real" in file.lower()
             if is_real:
-                # Parâmetros calibrados para fotos reais de 1024x1024 com 25 furos
+                # Parâmetros calibrados para fotos reais de biscoito água e sal (1600x900) com 22 furos
                 params = {
-                    "min_cookie_area": 250000,
-                    "min_solidity": 0.90,
-                    "min_hole_area": 80,
-                    "max_hole_area": 400,
-                    "expected_holes": 25
+                    "min_cookie_area": 140000,
+                    "min_solidity": 0.92,
+                    "min_hole_area": 30,
+                    "max_hole_area": 800,
+                    "expected_holes": 22,
+                    "is_real": True
                 }
             else:
                 # Parâmetros padrão para imagens sintéticas de 500x500 com 9 furos
@@ -113,7 +114,8 @@ def run_evaluation():
                     "min_solidity": 0.95,
                     "min_hole_area": 15,
                     "max_hole_area": 400,
-                    "expected_holes": 9
+                    "expected_holes": 9,
+                    "is_real": False
                 }
 
             # Executar pipeline
